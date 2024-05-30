@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+import os
+import argparse
+import yt_dlp
+
+# Micronzone's YTDClip
+# https://github.com/micronzone/YTDClip
+def print_signature():
+    columns = os.get_terminal_size().columns
+    text = "YTDClip v1.0.0 (https://github.com/micronzone/YTDClip)"
+    text_length = len(text)
+    padding_length = (columns - text_length) // 2
+    pattern = "*="
+    full_pattern = pattern * (padding_length // len(pattern))
+    line = full_pattern + text + full_pattern
+    if len(line) < columns:
+        line += pattern[:columns - len(line)]
+    print(line)
+
+# 형식 지정 매핑
+FORMAT_MAP = {
+    'b': 'b[ext=mp4]',
+    'bv': 'bv[ext=mp4]/b[ext=mp4]',
+    'ba': 'ba[ext=m4a]/b[ext=mp4]',
+    'bb': 'bv[ext=mp4]+ba[ext=m4a]/b[ext=mp4]'
+}
+
+def download_video(url, format_ext, format_quality, output_dir, debug):
+    ydl_opts = {
+        'format': format_quality,
+        'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
+        'progress_hooks': [],
+    }
+
+    if format_ext:
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': format_ext,
+        }]
+
+    if debug:
+        ydl_opts['verbose'] = True
+
+    def my_hook(d):
+        if d['status'] == 'finished':
+            print(f"Finished downloading: {d['filename']}")
+
+    ydl_opts['progress_hooks'].append(my_hook)
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+
+def interactive_mode(output_dir=None, url=None, format_ext=None, format_quality=None):
+    url = url or input("Enter YouTube URL: ")
+    format_ext = format_ext or input("Enter format (mp4, webm, mp3, m4a, etc.): ")
+    format_quality = format_quality or input("Enter quality (bb for best video+audio, bv for best video, ba for best audio, b for best): ")
+    output_dir = output_dir or input("Enter output directory: ")
+
+    format_quality = FORMAT_MAP.get(format_quality, format_quality)
+
+    download_video(url, format_ext, format_quality, output_dir, False)
+
+def load_urls_from_file(file_path):
+    if not os.path.exists(file_path):
+        print("Error: File not found.")
+        return []
+
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    urls = []
+    for line in lines:
+        # URL과 주석을 파싱하여 출력
+        url, _, comment = line.partition(',')
+        urls.append((url.strip(), comment.strip()))
+
+    print("Loaded URLs:")
+    max_url_length = max(len(url) for url, _ in urls)  # 가장 긴 URL의 길이 계산
+    for i, (url, comment) in enumerate(urls, 1):
+        if comment:
+            print(f"{i}. {url.ljust(max_url_length)}  # {comment}")
+        else:
+            print(f"{i}. {url}")
+
+    selection = input("Select URLs to download (e.g., 1, 2, 3 or 'all'): ")
+    if selection.lower() == 'all':
+        return [url for url, _ in urls]
+    selected_indices = map(int, selection.split(','))
+    return [urls[i - 1][0] for i in selected_indices]
+
+def main():
+    print_signature()
+    parser = argparse.ArgumentParser(description="YouTube Video Downloader")
+    parser.add_argument("url", nargs="?", help="YouTube URL")
+    parser.add_argument("-a", action="store_true", help="Run in interactive mode")
+    parser.add_argument("-l", type=str, help="Load URLs from a file")
+    parser.add_argument("-e", type=str, help="Select extension (mp4, webm, mp3, m4a, etc.)")
+    parser.add_argument("-f", type=str, choices=['b', 'bv', 'ba', 'bb'], help="Select quality (b, bv, ba, bb)")
+    parser.add_argument("-o", type=str, help="Output directory")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+
+    args = parser.parse_args()
+
+    format_quality = FORMAT_MAP.get(args.f)
+
+    if args.a:
+        if args.l:
+            urls = load_urls_from_file(args.l)
+            if urls:
+                output_dir = args.o or input("Enter output directory: ")
+                format_ext = args.e or input("Enter format (mp4, webm, mp3, m4a, etc.): ")
+                format_quality = format_quality or FORMAT_MAP[input("Enter quality (bb for best video+audio, bv for best video, ba for best audio, b for best): ")]
+                for url in urls:
+                    download_video(url, format_ext, format_quality, output_dir, args.debug)
+        else:
+            interactive_mode(output_dir=args.o, url=args.url, format_ext=args.e, format_quality=format_quality)
+    else:
+        if not args.url:
+            print("Error: URL is required unless in interactive mode.")
+            return
+        output_dir = args.o or input("Enter output directory: ")
+        download_video(args.url, args.e, format_quality, output_dir, args.debug)
+
+if __name__ == "__main__":
+    main()
