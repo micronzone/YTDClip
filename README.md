@@ -12,7 +12,7 @@ YTDClip은 다양한 형식과 품질 옵션을 제공하여 YouTube 동영상�
 - 파일에서 URL 목록을 불러와 일괄 다운로드
 - 인터랙티브 모드 지원 (대화형으로 쉬운 진행)
 
-<img width="682" alt="ss" src="https://github.com/micronzone/YTDClip/assets/47780105/19354212-f332-4664-afb4-cca588a76ea5">
+<img width="682" alt="ss" src="https://github.com/micronzone/YTDClip/assets/47780105/55f09620-cdc6-4c47-93bb-ef2ba674b0ad">
 
 ### 설치
 
