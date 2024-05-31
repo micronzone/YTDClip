@@ -16,14 +16,45 @@ YTDClip은 다양한 형식과 품질 옵션을 제공하여 YouTube 동영상�
 
 ### 설치
 
-Python 패키지 매니저인 pip를 사용하여 `yt-dlp`를 설치할 수 있습니다.
+프로젝트를 클론합니다:
+
+```bash
+git clone https://github.com/micronzone/YTDClip.git
+cd YTDClip
+```
+
+실행 권한 부여:
+```bash
+chmod +x ytdclip
+```
+
+(선택 사항) 가상 환경을 생성하고 활성화합니다:
+```sh
+python3 -m venv .venv
+source .venv/bin/activate  # Linux 또는 macOS
+.\.venv\Scripts\activate   # Windows
+```
+
+pip를 사용하여 `yt-dlp`를 설치:
 
 ```bash
 pip3 install yt-dlp
 ```
+
 또는
 ```bash
 pip3 install -r requirements.txt
+```
+
+별칭 추가 (선택 사항):
+
+```bash
+nano ~/.zshrc   # macOS ~/.zshrc, Linux `~/.bashrc` or `~/.zshrc`
+alias ytdclip='/path/to/ytdclip'
+```
+
+```bash
+source ~/.zshrc
 ```
 
 ### 사용법
@@ -40,17 +71,19 @@ YTDClip은 명령줄 인터페이스(CLI)를 통해 사용하거나, 인터랙�
 - `--debug`: 디버그 로깅 활성화
 
 ### 명령줄 인터페이스 (CLI) 사용법
+
 기본적인 사용법은 다음과 같습니다:
 
 ```bash
-python3 ytdclip
-python3 ytdclip [YouTube URL]
-python3 ytdclip [options] [YouTube URL]
+# ytdclip을 별칭에 추가한 실행 방법입니다(설치 참고) 또는 YTDClip 디렉토리에서 ./ytdclip 실행
+ytdclip
+ytdclip [YouTube URL]
+ytdclip [options] [YouTube URL]
 ```
 
 YouTube URL 목록 사용
 ```bash
-python3 ytdclip [options] [Favorites.txt]
+ytdclip [options] [Favorites.txt]
 ```
 
 ```bash
@@ -62,30 +95,31 @@ https://www.youtube.com/@example/playlists, 즐겨찾는 재생목록
 ```
 
 ## 예제
+
 YouTube 동영상을 다운로드하는 간단한 예제입니다:
 
 대화형 다운로드 실행
 ```bash
-python3 ytdclip -a
+ytdclip -a
 ```
 
 옵션을 지정하여 대화형 다운로드 실행
 ```bash
-python3 ytdclip -a -o ~/Downloads
-python3 ytdclip -a -o ~/Downloads -e mp4
-python3 ytdclip -a -o ~/Downloads -e mp4 -f b
-python3 ytdclip -a -o ~/Downloads -e mp4 -f b -l favorites.txt
+ytdclip -a -o ~/Downloads
+ytdclip -a -o ~/Downloads -e mp4
+ytdclip -a -o ~/Downloads -e mp4 -f b
+ytdclip -a -o ~/Downloads -e mp4 -f b -l favorites.txt
 ```
 
 명령줄에서 다운로드 실행
 
 ```bash
-python3 ytdclip -o ~/Downloads -e mp4 -f b https://www.youtube.com/watch?v=YOUR_VIDEO_ID
+ytdclip -o ~/Downloads -e mp4 -f b https://www.youtube.com/watch?v=YOUR_VIDEO_ID
 ```
 
 명령줄에서 YouTube URL 목록 실행
 ```bash
-python3 ytdclip -o ~/Downloads -e mp4 -f b -l favorites.txt
+ytdclip -o ~/Downloads -e mp4 -f b -l favorites.txt
 ```
 
 ### 업데이트
