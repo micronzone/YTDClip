@@ -17,19 +17,70 @@ def print_signature():
         line += pattern[:columns - len(line)]
     print(line)
 
-# 형식 지정 매핑
-FORMAT_MAP = {
-    'b': 'b[ext=mp4]',
-    'bv': 'bv[ext=mp4]/b[ext=mp4]',
-    'ba': 'ba[ext=m4a]/b[ext=mp4]',
-    'bb': 'bv[ext=mp4]+ba[ext=m4a]/b[ext=mp4]'
+DEFAULT_FORMAT_MAP = {
+    'b': 'b',
+    'bv': 'bv/b',
+    'ba': 'ba/b',
+    'bb': 'bv+ba/b'
 }
 
-def download_video(url, format_ext, format_quality, output_dir, debug):
+def build_format_string(base='b', **kwargs):
+    video_parts = []
+    audio_parts = []
+    
+    video_args = {'vext': '[ext={}]', 'height': '[height<={}]', 'fps': '[fps<={}]', 'vcodec': '[vcodec={}]', 'hdr': '[hdr={}]'}
+    audio_args = {'aext': '[ext={}]', 'acodec': '[acodec={}]'}
+
+    for key, value in kwargs.items():
+        if key == 'vext':
+            value = value or 'mp4'
+        elif key == 'aext':
+            value = value or 'm4a'
+
+        if value is not None and key in video_args:
+            video_parts.append(video_args[key].format(value))
+        elif value is not None and key in audio_args:
+            audio_parts.append(audio_args[key].format(value))
+
+    video_format_string = "".join(video_parts) or '[ext=mp4]'
+    audio_format_string = "".join(audio_parts) or '[ext=m4a]'
+
+    if base == 'bv':
+        return f'bv{video_format_string}/b'
+    elif base == 'ba':
+        return f'ba{audio_format_string}/b'
+    elif base == 'bb':
+        return f'bv{video_format_string}+ba{audio_format_string}/b'
+    else:
+        return 'b'
+
+def build_format_map(**kwargs):
+    format_map = {
+        'b': build_format_string('b', **kwargs),
+        'bv': build_format_string('bv', **kwargs),
+        'ba': build_format_string('ba', **kwargs),
+        'bb': build_format_string('bb', **kwargs)
+    }
+    return format_map
+
+def build_extra_opts(args):
+    extra_opts = {
+        'writesubtitles': args.write_subs,
+        'writeautomaticsub': args.write_auto_subs,
+        'subtitleslangs': args.sub_langs.split(',') if args.sub_langs else None,
+        'writethumbnail': args.write_thumbnail,
+        'daterange': args.date
+    }
+    # Remove None values from extra_opts
+    extra_opts = {k: v for k, v in extra_opts.items() if v is not None}
+    return extra_opts
+
+def download_video(url, format_ext, format_quality, output_dir, debug, extra_opts):
     ydl_opts = {
         'format': format_quality,
-        'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
+        'outtmpl': os.path.join(output_dir, '%(title)s[%(id)s][%(upload_date>%Y-%m-%d)s].%(ext)s'),
         'progress_hooks': [],
+        **extra_opts  # Extra options merged here
     }
 
     if format_ext:
@@ -50,15 +101,15 @@ def download_video(url, format_ext, format_quality, output_dir, debug):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-def interactive_mode(output_dir=None, url=None, format_ext=None, format_quality=None):
+def interactive_mode(output_dir=None, url=None, format_ext=None, format_quality=None, format_map=None, extra_opts=None):
     url = url or input("Enter YouTube URL: ")
-    format_ext = format_ext or input("Enter format (mp4, webm, mp3, m4a, etc.): ")
+    format_ext = format_ext or input("Enter format (mp4, webm, mp3, m4a, etc. or empty): ")
     format_quality = format_quality or input("Enter quality (bb for best video+audio, bv for best video, ba for best audio, b for best): ")
     output_dir = output_dir or input("Enter output directory: ")
 
-    format_quality = FORMAT_MAP.get(format_quality, format_quality)
+    format_quality = format_map.get(format_quality, format_quality)
 
-    download_video(url, format_ext, format_quality, output_dir, False)
+    download_video(url, format_ext, format_quality, output_dir, False, extra_opts)
 
 def load_urls_from_file(file_path):
     if not os.path.exists(file_path):
@@ -70,12 +121,11 @@ def load_urls_from_file(file_path):
 
     urls = []
     for line in lines:
-        # URL과 주석을 파싱하여 출력
         url, _, comment = line.partition(',')
         urls.append((url.strip(), comment.strip()))
 
     print("Loaded URLs:")
-    max_url_length = max(len(url) for url, _ in urls)  # 가장 긴 URL의 길이 계산
+    max_url_length = max(len(url) for url, _ in urls)
     for i, (url, comment) in enumerate(urls, 1):
         if comment:
             print(f"{i}. {url.ljust(max_url_length)}  # {comment}")
@@ -86,7 +136,7 @@ def load_urls_from_file(file_path):
     if selection.lower() == 'all':
         return [url for url, _ in urls]
     selected_indices = map(int, selection.split(','))
-    return [urls[i - 1][0] for i in selected_indices]
+    return [urls[i - 1][0] for i in selected_indices if 0 < i <= len(urls)]  # Ensure valid indices
 
 def main():
     print_signature()
@@ -94,32 +144,50 @@ def main():
     parser.add_argument("url", nargs="?", help="YouTube URL")
     parser.add_argument("-a", action="store_true", help="Run in interactive mode")
     parser.add_argument("-l", type=str, help="Load URLs from a file")
-    parser.add_argument("-e", type=str, help="Select extension (mp4, webm, mp3, m4a, etc.)")
+    parser.add_argument("-e", type=str, help="Select extension (mp4, webm, mp3, m4a, etc. or empty)")
     parser.add_argument("-f", type=str, choices=['b', 'bv', 'ba', 'bb'], help="Select quality (b, bv, ba, bb)")
     parser.add_argument("-o", type=str, help="Output directory")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--height", type=int, help="Specify maximum height (4320 > 2160 > 1440 > 1080 > 720 > 480 > 360 > 240)")
+    parser.add_argument("--fps", type=int, help="Specify maximum fps (60, 30)")
+    parser.add_argument("--acodec", type=str, help="Specify audio codec (flac/alac > wav/aiff > opus > vorbis > aac > mp4a > mp3 > ac4 > eac3 > ac3 > dts > other)")
+    parser.add_argument("--vcodec", type=str, help="Specify video codec (av01 > vp9.2 > vp9 > h265 > h264 > vp8 > h263 > theora > other)")
+    parser.add_argument("--aext", type=str, help="Specify audio extension (m4a > aac > mp3 > ogg > opus > webm > other)")
+    parser.add_argument("--vext", type=str, help="Specify video extension (mp4 > mov > webm > flv > other)")
+    parser.add_argument("--hdr", type=str, help="Specify HDR type (DV > HDR12 > HDR10+ > HDR10 > HLG > SDR)")
+    parser.add_argument("--write-subs", action="store_true", help="Write subtitles to a file")
+    parser.add_argument("--write-auto-subs", action="store_true", help="Write automatically generated subtitles to a file")
+    parser.add_argument("--sub-langs", type=str, help="Languages of the subtitles to download (e.g., en, ko)")
+    parser.add_argument("--write-thumbnail", action="store_true", help="Write thumbnail image")
+    parser.add_argument("--date", type=str, help="Download only videos uploaded on this date (YYYYMMDD)")
 
     args = parser.parse_args()
 
-    format_quality = FORMAT_MAP.get(args.f)
+    format_map = build_format_map(vext=args.vext, height=args.height, fps=args.fps, aext=args.aext, acodec=args.acodec, vcodec=args.vcodec, hdr=args.hdr)
+    format_quality = format_map.get(args.f, DEFAULT_FORMAT_MAP.get(args.f))
+
+    extra_opts = build_extra_opts(args)
+
+    if args.l:
+        urls = load_urls_from_file(args.l)
+        if urls:
+            output_dir = args.o or input("Enter output directory: ")
+            format_ext = args.e or input("Enter format (mp4, webm, mp3, m4a, etc. or empty): ")
+            format_quality = format_quality or format_map[input("Enter quality (bb for best video+audio, bv for best video, ba for best audio, b for best): ")]
+            for url in urls:
+                download_video(url, format_ext, format_quality, output_dir, args.debug, extra_opts)
+        return
 
     if args.a:
-        if args.l:
-            urls = load_urls_from_file(args.l)
-            if urls:
-                output_dir = args.o or input("Enter output directory: ")
-                format_ext = args.e or input("Enter format (mp4, webm, mp3, m4a, etc.): ")
-                format_quality = format_quality or FORMAT_MAP[input("Enter quality (bb for best video+audio, bv for best video, ba for best audio, b for best): ")]
-                for url in urls:
-                    download_video(url, format_ext, format_quality, output_dir, args.debug)
-        else:
-            interactive_mode(output_dir=args.o, url=args.url, format_ext=args.e, format_quality=format_quality)
+        interactive_mode(output_dir=args.o, url=args.url, format_ext=args.e, format_quality=format_quality, format_map=format_map, extra_opts=extra_opts)
     else:
         if not args.url:
-            print("Error: URL is required unless in interactive mode.")
-            return
-        output_dir = args.o or input("Enter output directory: ")
-        download_video(args.url, args.e, format_quality, output_dir, args.debug)
+            print("No URL provided, entering interactive mode.")
+            interactive_mode(output_dir=args.o, url=args.url, format_ext=args.e, format_quality=format_quality, format_map=format_map, extra_opts=extra_opts)
+        else:
+            output_dir = args.o or input("Enter output directory: ")
+            download_video(args.url, args.e, format_quality, output_dir, args.debug, extra_opts)
 
 if __name__ == "__main__":
     main()
+
