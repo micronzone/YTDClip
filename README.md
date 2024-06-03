@@ -7,7 +7,7 @@
 
 YTDClip is a tool that simplifies downloading YouTube videos by offering various format and quality options. This project is built using the yt-dlp library in Python.
 
-> I created YTDClip to eliminate the hassle of manually searching for and downloading regularly updated content one by one.
+> I created YTDClip to reduce the hassle of finding and downloading regularly updated content one by one. By adding items to your favorites list and specifying their numbers, YTDClip will skip already downloaded content and download only the newly updated content.
 
 ## Features
 
